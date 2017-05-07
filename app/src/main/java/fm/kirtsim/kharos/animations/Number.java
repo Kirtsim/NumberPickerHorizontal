@@ -21,6 +21,7 @@ public class Number extends AppCompatTextView {
 
     interface NumberClickListener {
         void onFingerDown();
+        void onFingerUp();
         void onNumberClicked(int value, int index, Number number);
     }
 
@@ -59,6 +60,10 @@ public class Number extends AppCompatTextView {
         clickListener.onFingerDown();
     }
 
+    private void onFingerUp() {
+        clickListener.onFingerUp();
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         return gestureDetector.onTouchEvent(event);
@@ -79,9 +84,15 @@ public class Number extends AppCompatTextView {
         }
 
         @Override
+        public boolean onDoubleTap(MotionEvent e) {
+            listener.get().onFingerUp();
+            return true;
+        }
+
+        @Override
         public boolean onSingleTapConfirmed(MotionEvent e) {
             listener.get().onTapped();
-            return true;
+            return false;
         }
     }
 }

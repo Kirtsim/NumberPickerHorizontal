@@ -1,7 +1,5 @@
 package fm.kirtsim.kharos.animations;
 
-import android.animation.Animator;
-import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
@@ -99,6 +97,7 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
         numberTV.setTextSize(TypedValue.COMPLEX_UNIT_SP, 25);
         numberTV.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
         numberTV.setTextColor(Color.WHITE);
+        numberTV.setBackgroundColor(Color.GREEN);
         return numberTV;
     }
 
@@ -193,13 +192,11 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     public boolean onTouchEvent(MotionEvent ev) {
         if (ev.getAction() == MotionEvent.ACTION_DOWN)
             onFingerDown();
-        if (ev.getAction() == MotionEvent.ACTION_UP) {
-            Log.d(TAG, "actionUP");
+        else if (ev.getAction() == MotionEvent.ACTION_UP) {
             fingerDown = false;
             if (!isScrolling)
                 onScrollEnd(getScrollX());
-        } else
-            fingerDown = true;
+        }
         return super.onTouchEvent(ev);
     }
 
@@ -209,6 +206,7 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
         scrollDirection = l > oldl ? SCROLL_RIGHT : SCROLL_LEFT;
         if (!isScrolling) {
             isScrolling = true;
+            deselectNumber();
             checkEndOfScroll();
         }
     }
@@ -219,7 +217,6 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
             initialScrollX = currentScrollX;
             scheduleScrollEndCheck();
         } else {
-//            Log.d(TAG, "setting isScrolling to false");
             isScrolling = false;
             if (!fingerDown)
                 onScrollEnd(currentScrollX);
@@ -232,15 +229,19 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     }
 
     private void onScrollEnd(int currentScrollX) {
-        settleToSelection(currentScrollX);
-        animateNumberBeingSelected();
+        if (settleToSelection(currentScrollX))
+            applySelection();
     }
 
-    private void settleToSelection(final int currentScroll) {
+    private boolean settleToSelection(final int currentScroll) {
         final int index = calculateNumberIndex(currentScroll);
         selectedNumber = (Number) container.getChildAt(index + 1);
-        final int numberWidth = selectedNumber.getWidth();
-        this.post(() -> smoothScrollTo(index * numberWidth, 0));
+        final int scrollTo = index * selectedNumber.getWidth();
+        if (scrollTo != currentScroll) {
+            this.post(() -> smoothScrollTo(scrollTo, 0));
+            return false;
+        }
+        return true;
     }
 
     private int calculateNumberIndex(final int currentScroll) {
@@ -256,7 +257,6 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     }
 
     private void deselectNumber() {
-        Log.d(TAG, "deselecting");
         selectedNumber.setTextSize(textSizeSP);
         selectedNumber.setTypeface(null, Typeface.NORMAL);
     }
@@ -267,49 +267,22 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     }
 
     @Override
+    public void onFingerUp() {
+        fingerDown = false;
+    }
+
+    @Override
     public void onFingerDown() {
-        deselectNumber();
         fingerDown = true;
     }
 
     @Override
     public void onNumberClicked(int value, int index, Number number) {
-        int toScroll = (index * number.getWidth()) - getScrollX();
-        this.post(() -> smoothScrollBy(toScroll, 0));
-    }
-
-    private void animateNumberBeingSelected() {
-//        ValueAnimator animator = createAnimatorForNumberSize(10.0f, 100);
-//        animator.addListener(createAnimListenerToBoldNumber());
-//        animator.start();
-//        Log.d(TAG, "selecting");
-        selectedNumber.setTextSize(textSizeSP + 6.0f);
-        selectedNumber.setTypeface(null, Typeface.BOLD);
-    }
-
-
-    private ValueAnimator createAnimatorForNumberSize(float sizeChange, int duration) {
-        final float textSize = selectedNumber.getTextSize();
-        ValueAnimator animator = ValueAnimator.ofFloat(textSize, textSize + sizeChange);
-        animator.setDuration(duration);
-        animator.addUpdateListener(a -> selectedNumber.
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, (float) a.getAnimatedValue()));
-        return animator;
-    }
-
-    private Animator.AnimatorListener createAnimListenerToBoldNumber() {
-        return new Animator.AnimatorListener() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-
-            }
-
-            @Override public void onAnimationStart(Animator animation) {
-//                selectedNumber.setTypeface(null, Typeface.BOLD);
-            }
-            @Override public void onAnimationCancel(Animator animation) {}
-            @Override public void onAnimationRepeat(Animator animation) {}
-        };
+        fingerDown = false;
+        if (number != selectedNumber) {
+            int toScroll = (index * number.getWidth()) - getScrollX();
+            this.post(() -> smoothScrollBy(toScroll, 0));
+        }
     }
 
     /**
