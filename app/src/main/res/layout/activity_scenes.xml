@@ -1,75 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/mainLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-
-    <fm.kirtsim.kharos.animations.NumberPicker
-        android:id="@+id/numberPicker"
-        android:background="#fff333"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="30dp">
-    </fm.kirtsim.kharos.animations.NumberPicker>
-
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="80dp"
-        android:layout_alignParentBottom="true">
-        <HorizontalScrollView
-            android:background="@color/colorPrimary"
-            android:layout_width="match_parent"
-            android:layout_height="80dp"
-
-            >
-            <LinearLayout
-                android:id="@+id/number_bar"
-                android:layout_width="wrap_content"
-                android:background="@color/colorPrimaryDark"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center">
-                <TextView
-                    android:id="@+id/num8"
-                    android:text="8"
-                    android:textColor="#fff"
-                    android:textSize="25sp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="30dp"/>
-
-                <TextView
-                    android:id="@+id/num9"
-                    android:text="9"
-                    android:textColor="#fff"
-                    android:textSize="25sp"
-                    android:layout_marginEnd="15dp"
-                    android:layout_marginStart="15dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    />
-
-                <TextView
-                    android:id="@+id/num10"
-                    android:text="10"
-                    android:textColor="#fff"
-                    android:textSize="25sp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="30dp"/>
-            </LinearLayout>
-        </HorizontalScrollView>
-        <FrameLayout
-            android:id="@+id/container"
-            android:background="@drawable/rect_num_tool"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center">
-        </FrameLayout>
-    </FrameLayout>
-
-
-
-
 </RelativeLayout>

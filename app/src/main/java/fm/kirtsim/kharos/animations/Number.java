@@ -48,6 +48,10 @@ public class Number extends AppCompatTextView {
         return Integer.parseInt(getText().toString());
     }
 
+    public void setNumber(final int number) {
+        this.setText(String.valueOf(number));
+    }
+
     public int getIndex() {
         return this.index;
     }

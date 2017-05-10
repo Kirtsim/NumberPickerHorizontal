@@ -1,12 +1,12 @@
 package fm.kirtsim.kharos.animations;
 
 import android.content.Context;
-import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.support.annotation.IntRange;
@@ -14,7 +14,6 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -24,9 +23,9 @@ import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.Space;
-import android.widget.TextView;
 
 import java.lang.ref.WeakReference;
+
 
 /**
  *
@@ -37,15 +36,17 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     public static final String TAG = HorizontalScrollView.class.getSimpleName();
     private static final int SCROLL_LEFT = 0;
     private static final int SCROLL_RIGHT = 1;
-    private final int TEXT_VIEW_WIDTH_DP = 60;
+    private static final int NUMBER_START_INDEX = 1;
+    private static final float FONT_SIZE_ADDITION = 6.0f;
+    private int text_view_width_px = 60;
 
     private int min, max;
     private LinearLayout container;
+    private Background background;
     private Number selectedNumber;
 
     private int initialScrollX;
     private int scrollDirection;
-    private int textViewWidth;
     private float textSizeSP;
     private boolean isScrolling;
     private boolean fingerDown;
@@ -67,27 +68,41 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     }
 
     private void initialize(Context context) {
-        min = 1;
-        max = 50;
+        min = 1234;
+        max = 1239;
         textSizeSP = 25;
         this.setHorizontalScrollBarEnabled(false);
+        initializeTextViewWidth(context);
         initializeContainers(context);
-        this.addView(container);
-        populateWithNumbers();
-        selectedNumber = (Number) container.getChildAt(1);
+        insertSpaces(context);
+        addNumbersUpToMax(min);
+        selectedNumber = (Number) container.getChildAt(NUMBER_START_INDEX);
+        applySelection();
+    }
+
+    private void initializeTextViewWidth(Context context) {
+        Paint paint = new Paint();
+        Rect bounds = new Rect();
+        String text = String.valueOf(max);
+        paint.setTextSize(spToPixels((int) (textSizeSP + FONT_SIZE_ADDITION), context));
+        paint.getTextBounds(text, 0, text.length(), bounds);
+        text_view_width_px = (bounds.width() + bounds.width() / 2);
     }
 
     private void initializeContainers(Context context) {
         container = new LinearLayout(context);
         container.setLayoutParams(createContainerLayoutParams());
         container.setOrientation(LinearLayout.HORIZONTAL);
+        this.addView(container);
     }
 
-    private void populateWithNumbers() {
-        final int viewWidth = (int) densityToPixels(TEXT_VIEW_WIDTH_DP, getContext());
-        int index = 0;
-        for (int number = min; number <= max; number++)
-            container.addView(createNumber(number, index++, viewWidth));
+    private void insertSpaces(final Context context) {
+        final Space startSpace = new Space(context);
+        final Space endSpace = new Space(context);
+        startSpace.setLayoutParams(new ViewGroup.LayoutParams(0,0));
+        endSpace.setLayoutParams(new ViewGroup.LayoutParams(0,0));
+        container.addView(startSpace, 0);
+        container.addView(endSpace);
     }
 
     private Number createNumber(final int number, final int index, final int width) {
@@ -97,78 +112,118 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
         numberTV.setTextSize(TypedValue.COMPLEX_UNIT_SP, 25);
         numberTV.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
         numberTV.setTextColor(Color.WHITE);
-        numberTV.setBackgroundColor(Color.GREEN);
         return numberTV;
     }
 
+    public int getNumberCount() {
+        return container.getChildCount() - 2;
+    }
 
+    public int getMin() {
+        return min;
+    }
 
-    private void setMax(int max) {
-        this.max = max;
-        if (max < min)
-            setMin(max);
+    public int getMax() {
+        return max;
+    }
+
+    public void setMax(int max) {
+        if (max >= min)
+            this.max = max;
     }
 
     public void setMin(int min) {
-        this.min = min;
-        if (min > max)
-            setMax(min);
+        if (min <= max)
+            this.min = min;
     }
 
-    public void setNumberWidthInDP(int width) {
-        this.textViewWidth = (int) densityToPixels(width, getContext());
-        updateNumbersWidth(width);
+    public void applyBoundaryChanges() {
+        applyLowerBoundary();
+        applyHigherBoundary();
     }
 
-
-
-
-    private void updateNumbersWidth(final int width) {
-        final int numberCount = container.getChildCount() - 1;
-        for (int i = 1; i < numberCount; ++i) {
-            TextView number = (TextView) container.getChildAt(i);
-            ViewGroup.LayoutParams params = number.getLayoutParams();
-            params.width = width;
-            number.setLayoutParams(params);
+    private void applyLowerBoundary() {
+        final int lowestNumber = ((Number) container.getChildAt(1)).getNumber();
+        if (min < lowestNumber)
+            addNumbersToFront(lowestNumber);
+        else if (min > lowestNumber) {
+            removeNumbers(NUMBER_START_INDEX, 0);
         }
+    }
+
+    private void applyHigherBoundary() {
+        // TODO: implement adding or removing numbers from the end
+    }
+
+    private void addNumbersToFront(final int stopNumber) {
+        if (stopNumber < min)
+            return;
+
+        final int insertCount = stopNumber - min + 1;
+        final int oldLastIndex = getLastNumberIndex();
+        final int startNumber = ((Number)container.getChildAt(oldLastIndex + 1 - insertCount)).getNumber();
+        addNumbersUpToMax(startNumber);
+
+        final int toOverrideCount = oldLastIndex - NUMBER_START_INDEX + 1;
+        overrideNumbers(NUMBER_START_INDEX, min, toOverrideCount);
+    }
+
+    private void addNumbersUpToMax(int startNumber) {
+        int index = getLastNumberIndex() + 1;
+        while (startNumber <= max) {
+            Number num = createNumber(startNumber++, index, text_view_width_px);
+            container.addView(num, index++);
+        }
+    }
+
+    private int getLastNumberIndex() {
+        return container.getChildCount() - 2;
+    }
+
+    private void overrideNumbers(int startIndex, int startNumber, final int count) {
+        if (startIndex + count > container.getChildCount() - 1)
+            throw new IndexOutOfBoundsException();
+        for (int i = 0; i < count; ++i, ++startIndex, ++startNumber) {
+            Number number = (Number) container.getChildAt(startIndex);
+            number.setNumber(startNumber);
+        }
+    }
+
+    private void removeNumbers(final int startIndexIncl, final int endIndexIncl) {
+        // in progress
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         if (w > 0 && h > 0) {
-            final int textViewWidth = (int) densityToPixels(TEXT_VIEW_WIDTH_DP, getContext());
-            insertSpaces(w, textViewWidth);
-            this.setBackground(createNewBackground(w, h));
+            inflateSpaces(w, text_view_width_px);
+            this.setBackground(initializeNewBackground(w, h));
         }
     }
 
-    private void insertSpaces(final int viewWidth, final int textViewWidth) {
+
+    private void inflateSpaces(final int viewWidth, final int textViewWidth) {
         final int spaceWidth = viewWidth / 2 - (textViewWidth / 2);
-        final Space startSpace = createSpace(spaceWidth);
-        final Space endSpace = createSpace(spaceWidth);
-        container.addView(startSpace, 0);
-        container.addView(endSpace);
+        final Space startSpace = (Space) container.getChildAt(0);
+        final Space endSpace = (Space) container.getChildAt(container.getChildCount() - 1);
+        startSpace.setLayoutParams(createLayoutParams(spaceWidth));
+        endSpace.setLayoutParams(createLayoutParams(spaceWidth));
     }
 
-    private Space createSpace(final int spaceWidth) {
-        Space space = new Space(getContext());
-        space.setLayoutParams(createLayoutParams(spaceWidth));
-        return space;
-    }
-
-    private Drawable createNewBackground(final int viewWidth, final int viewHeight) {
+    private Drawable initializeNewBackground(final int viewWidth, final int viewHeight) {
         Background background = new Background(this, viewWidth, viewHeight);
         background.setBackgroundColor(Color.BLUE);
         background.setForegroundColor(Color.WHITE);
+        this.background = background;
         return background;
     }
 
 
 
     private FrameLayout.LayoutParams createContainerLayoutParams() {
-        final int height =  (int) densityToPixels(TEXT_VIEW_WIDTH_DP, getContext());
-        return new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, height);
+        final float height = spToPixels((int) ((textSizeSP + FONT_SIZE_ADDITION) * 2), getContext());
+        return new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, (int) height);
     }
 
     private LinearLayout.LayoutParams createLayoutParams(int width) {
@@ -179,9 +234,13 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     }
 
     private static float densityToPixels(int dp, Context context) {
-        Resources resources = context.getResources();
-        DisplayMetrics metrics = resources.getDisplayMetrics();
-        return dp * ((float) metrics.densityDpi / DisplayMetrics.DENSITY_DEFAULT);
+        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, metrics);
+    }
+
+    private static float spToPixels(int sp, Context context) {
+        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, metrics);
     }
 
 
@@ -234,9 +293,9 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     }
 
     private boolean settleToSelection(final int currentScroll) {
-        final int index = calculateNumberIndex(currentScroll);
-        selectedNumber = (Number) container.getChildAt(index + 1);
-        final int scrollTo = index * selectedNumber.getWidth();
+        final int relIndex = calculateRelativeNumberIndex(currentScroll);
+        selectedNumber = (Number) container.getChildAt(relIndex + 1);
+        final int scrollTo = relIndex * selectedNumber.getWidth();
         if (scrollTo != currentScroll) {
             this.post(() -> smoothScrollTo(scrollTo, 0));
             return false;
@@ -244,7 +303,7 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
         return true;
     }
 
-    private int calculateNumberIndex(final int currentScroll) {
+    private int calculateRelativeNumberIndex(final int currentScroll) {
         final int numberWidth = selectedNumber.getWidth();
         double numberIndex = currentScroll / (numberWidth * 1.0f);
         double indexWhole = ((int) numberIndex) + 0.45;
@@ -262,7 +321,7 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     }
 
     private void applySelection() {
-        selectedNumber.setTextSize(textSizeSP + 6.0f);
+        selectedNumber.setTextSize(textSizeSP + FONT_SIZE_ADDITION);
         selectedNumber.setTypeface(null, Typeface.BOLD);
     }
 
@@ -280,7 +339,7 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     public void onNumberClicked(int value, int index, Number number) {
         fingerDown = false;
         if (number != selectedNumber) {
-            int toScroll = (index * number.getWidth()) - getScrollX();
+            int toScroll = ((index-1) * number.getWidth()) - getScrollX();
             this.post(() -> smoothScrollBy(toScroll, 0));
         }
     }
@@ -304,6 +363,8 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
             this.numberPickerWR = new WeakReference<>(numberPicker);
             this.viewWidth = viewWidth;
             this.viewHeight = viewHeight;
+            this.backgroundColor = Color.argb(0, 0, 0, 0);
+            this.foregroundColor = Color.BLACK;
             this.paint = new Paint();
             this.paint.setStrokeWidth(densityToPixels(3, numberPicker.getContext()));
             setPaintForBackground();
@@ -312,11 +373,12 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
         @Override
         public void draw(@NonNull Canvas canvas) {
             NumberPicker np = numberPickerWR.get();
-            final float textViewWidthHalf = densityToPixels(np.TEXT_VIEW_WIDTH_DP, np.getContext()) / 2;
+            final float textViewWidthHalf = np.text_view_width_px / 2;
             final float viewWidthHalf = viewWidth / 2.0f;
+
             final float left = viewWidthHalf - textViewWidthHalf;
             final float right = viewWidthHalf + textViewWidthHalf;
-            final float bottom = viewWidth - paint.getStrokeWidth();
+            final float bottom = viewHeight;
             final float top = 0;
             setPaintForBackground();
             canvas.drawRect(0, 0, viewWidth, viewHeight, paint);
