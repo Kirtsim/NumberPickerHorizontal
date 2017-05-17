@@ -53,13 +53,11 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
 
 
     public NumberPicker(Context context) {
-        super(context);
-        initialize(context);
+        this(context, null, 0);
     }
 
     public NumberPicker(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        initialize(context);
+        this(context, attrs, 0);
     }
 
     public NumberPicker(Context context, AttributeSet attrs, int defStyleAttr) {
@@ -67,9 +65,16 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
         initialize(context);
     }
 
+    @Override
+    public void setLayoutParams(ViewGroup.LayoutParams params) {
+        if (params != null && params.width == ViewGroup.LayoutParams.WRAP_CONTENT)
+            throw new IllegalArgumentException("Horizontal Number Picker's width must not be 'wrap_content'");
+        super.setLayoutParams(params);
+    }
+
     private void initialize(Context context) {
-        min = 1234;
-        max = 1239;
+        min = 1;
+        max = 3;
         textSizeSP = 25;
         this.setHorizontalScrollBarEnabled(false);
         initializeTextViewWidth(context);
@@ -81,12 +86,19 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     }
 
     private void initializeTextViewWidth(Context context) {
-        Paint paint = new Paint();
+        Rect bounds = getTextBoundsOfMax(context);
+        final int calculatedWidth = (bounds.width() + bounds.width() / 2);
+        final int minDefault = (int) defaultDimensionFromFontSize(textSizeSP, getContext());
+        text_view_width_px = Math.max(minDefault, calculatedWidth);
+    }
+
+    private Rect getTextBoundsOfMax(Context context) {
         Rect bounds = new Rect();
+        Paint paint = new Paint();
         String text = String.valueOf(max);
         paint.setTextSize(spToPixels((int) (textSizeSP + FONT_SIZE_ADDITION), context));
         paint.getTextBounds(text, 0, text.length(), bounds);
-        text_view_width_px = (bounds.width() + bounds.width() / 2);
+        return bounds;
     }
 
     private void initializeContainers(Context context) {
@@ -105,15 +117,7 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
         container.addView(endSpace);
     }
 
-    private Number createNumber(final int number, final int index, final int width) {
-        Number numberTV = new Number(getContext(), this, index);
-        numberTV.setLayoutParams(createLayoutParams(width));
-        numberTV.setText(String.valueOf(number));
-        numberTV.setTextSize(TypedValue.COMPLEX_UNIT_SP, 25);
-        numberTV.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        numberTV.setTextColor(Color.WHITE);
-        return numberTV;
-    }
+
 
     public int getNumberCount() {
         return container.getChildCount() - 2;
@@ -144,8 +148,10 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
 
     private void applyLowerBoundary() {
         final int lowestNumber = ((Number) container.getChildAt(1)).getNumber();
-        if (min < lowestNumber)
+        if (min < lowestNumber) {
             addNumbersToFront(lowestNumber);
+            post(() -> scrollBy(text_view_width_px * (lowestNumber - min), 0)); // with last number
+        }                           //selected it blinks (appears for a moment) to its right before scrolled
         else if (min > lowestNumber) {
             removeNumbers(NUMBER_START_INDEX, 0);
         }
@@ -159,25 +165,39 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
         if (stopNumber < min)
             return;
 
-        final int insertCount = stopNumber - min + 1;
-        final int oldLastIndex = getLastNumberIndex();
-        final int startNumber = ((Number)container.getChildAt(oldLastIndex + 1 - insertCount)).getNumber();
-        addNumbersUpToMax(startNumber);
-
-        final int toOverrideCount = oldLastIndex - NUMBER_START_INDEX + 1;
-        overrideNumbers(NUMBER_START_INDEX, min, toOverrideCount);
+        final int insertCount = stopNumber - min;
+        ensureNumberCapacity(insertCount);
+        overrideNumbers(NUMBER_START_INDEX, min, max - min + 1);
     }
 
     private void addNumbersUpToMax(int startNumber) {
         int index = getLastNumberIndex() + 1;
         while (startNumber <= max) {
-            Number num = createNumber(startNumber++, index, text_view_width_px);
+            Number num = createNumber(startNumber++, index);
+            container.addView(num, index++);
+        }
+    }
+
+    private void ensureNumberCapacity(int count) {
+        int index = getLastNumberIndex() + 1;
+        while (count-- > 0) {
+            Number num = createNumber(max, index);
             container.addView(num, index++);
         }
     }
 
     private int getLastNumberIndex() {
         return container.getChildCount() - 2;
+    }
+
+    private Number createNumber(final int number, final int index) {
+        Number numberTV = new Number(getContext(), this, index);
+        numberTV.setLayoutParams(createLayoutParams(text_view_width_px));
+        numberTV.setText(String.valueOf(number));
+        numberTV.setTextSize(TypedValue.COMPLEX_UNIT_SP, 25);
+        numberTV.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+        numberTV.setTextColor(Color.WHITE);
+        return numberTV;
     }
 
     private void overrideNumbers(int startIndex, int startNumber, final int count) {
@@ -192,6 +212,8 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     private void removeNumbers(final int startIndexIncl, final int endIndexIncl) {
         // in progress
     }
+
+
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
@@ -222,7 +244,7 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
 
 
     private FrameLayout.LayoutParams createContainerLayoutParams() {
-        final float height = spToPixels((int) ((textSizeSP + FONT_SIZE_ADDITION) * 2), getContext());
+        final float height = defaultDimensionFromFontSize(textSizeSP, getContext());
         return new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, (int) height);
     }
 
@@ -231,6 +253,10 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         params.gravity = Gravity.CENTER_VERTICAL;
         return params;
+    }
+
+    private static float defaultDimensionFromFontSize(final float fontSizeSP, final Context context) {
+        return spToPixels((int) ((fontSizeSP + FONT_SIZE_ADDITION) * 2), context);
     }
 
     private static float densityToPixels(int dp, Context context) {
