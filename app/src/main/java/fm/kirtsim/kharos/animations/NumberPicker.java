@@ -14,6 +14,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -50,7 +51,6 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     private float textSizeSP;
     private boolean isScrolling;
     private boolean fingerDown;
-
 
     public NumberPicker(Context context) {
         this(context, null, 0);
@@ -151,14 +151,13 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
         if (min < lowestNumber) {
             addNumbersToFront(lowestNumber);
             post(() -> scrollBy(text_view_width_px * (lowestNumber - min), 0)); // with last number
-        }                           //selected it blinks (appears for a moment) to its right before scrolled
+        }                   //selected it blinks (appears for a moment) to its right before scrolled
         else if (min > lowestNumber) {
-            removeNumbers(NUMBER_START_INDEX, 0);
+            final int removeCount = min - lowestNumber;
+            final int overrideCount = getNumberCount() - removeCount;
+            overrideNumbers(NUMBER_START_INDEX, min, overrideCount);
+            removeNumbers(removeCount);
         }
-    }
-
-    private void applyHigherBoundary() {
-        // TODO: implement adding or removing numbers from the end
     }
 
     private void addNumbersToFront(final int stopNumber) {
@@ -169,6 +168,32 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
         ensureNumberCapacity(insertCount);
         overrideNumbers(NUMBER_START_INDEX, min, max - min + 1);
     }
+
+    private void overrideNumbers(int startIndex, int startNumber, final int count) {
+        if (startIndex + count > container.getChildCount() - 1)
+            throw new IndexOutOfBoundsException();
+        for (int i = 0; i < count; ++i, ++startIndex, ++startNumber) {
+            Number number = (Number) container.getChildAt(startIndex);
+            number.setNumber(startNumber);
+        }
+    }
+
+    private void applyHigherBoundary() {
+        final int maxNumber = ((Number) container.getChildAt(getLastNumberIndex())).getNumber();
+        if (maxNumber < max)
+            addNumbersUpToMax(maxNumber+1);
+        else
+            removeNumbers(maxNumber - max);
+    }
+
+    private void removeNumbers(final int count) {
+        final int lastIndex = getLastNumberIndex();
+        final int removeFromIndex = lastIndex - count + 1;
+        if (removeFromIndex <= NUMBER_START_INDEX)
+            throw new IllegalArgumentException("Trying to remove too many numbers");
+        container.removeViews(removeFromIndex, count);
+    }
+
 
     private void addNumbersUpToMax(int startNumber) {
         int index = getLastNumberIndex() + 1;
@@ -199,21 +224,6 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
         numberTV.setTextColor(Color.WHITE);
         return numberTV;
     }
-
-    private void overrideNumbers(int startIndex, int startNumber, final int count) {
-        if (startIndex + count > container.getChildCount() - 1)
-            throw new IndexOutOfBoundsException();
-        for (int i = 0; i < count; ++i, ++startIndex, ++startNumber) {
-            Number number = (Number) container.getChildAt(startIndex);
-            number.setNumber(startNumber);
-        }
-    }
-
-    private void removeNumbers(final int startIndexIncl, final int endIndexIncl) {
-        // in progress
-    }
-
-
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
