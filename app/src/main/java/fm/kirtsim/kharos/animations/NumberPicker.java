@@ -73,8 +73,7 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     }
 
     private void initialize(Context context) {
-        min = 1;
-        max = 3;
+        min = max = 0;
         textSizeSP = 25;
         this.setHorizontalScrollBarEnabled(false);
         initializeTextViewWidth(context);
@@ -139,6 +138,25 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     public void setMin(int min) {
         if (min <= max)
             this.min = min;
+    }
+
+    public float getTextSizeSP() {
+        return textSizeSP;
+    }
+
+    public void setTextSizeSP(int txtSize) {
+        textSizeSP = txtSize;
+        text_view_width_px = (int) defaultDimensionFromFontSize(txtSize, getContext());
+        final int lastIndex = getLastNumberIndex();
+        for (int i = NUMBER_START_INDEX; i <= lastIndex; ++i) {
+            Number num = (Number) container.getChildAt(i);
+            num.setTextSize(TypedValue.COMPLEX_UNIT_SP, txtSize);
+            ViewGroup.LayoutParams params = num.getLayoutParams();
+            params.width = text_view_width_px;
+            num.setLayoutParams(params);
+        }
+        inflateSpaces(getWidth(), text_view_width_px);
+        scrollToNumberWithIndex(selectedNumber.getIndex(), false);
     }
 
     public void applyBoundaryChanges() {
@@ -375,9 +393,16 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
     public void onNumberClicked(int value, int index, Number number) {
         fingerDown = false;
         if (number != selectedNumber) {
-            int toScroll = ((index-1) * number.getWidth()) - getScrollX();
-            this.post(() -> smoothScrollBy(toScroll, 0));
+            scrollToNumberWithIndex(index, true);
         }
+    }
+
+    private void scrollToNumberWithIndex(final int index, boolean smoothScroll) {
+        final int scrollTo = text_view_width_px * (index -1);
+        if (smoothScroll)
+            post(() -> smoothScrollTo(scrollTo, 0));
+        else
+            post(() -> scrollTo(scrollTo, 0));
     }
 
     /**
@@ -408,7 +433,7 @@ public class NumberPicker extends HorizontalScrollView implements Number.NumberC
 
         @Override
         public void draw(@NonNull Canvas canvas) {
-            NumberPicker np = numberPickerWR.get();
+            final NumberPicker np = numberPickerWR.get();
             final float textViewWidthHalf = np.text_view_width_px / 2;
             final float viewWidthHalf = viewWidth / 2.0f;
 
